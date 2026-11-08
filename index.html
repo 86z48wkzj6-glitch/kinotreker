@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f7f5"><link rel="manifest" href="manifest.webmanifest">
+<title>Кинотрекер</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20201f;background:#f7f7f5}
+*{box-sizing:border-box}body{margin:0;padding:20px 16px 40px;max-width:900px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;margin:8px 0 22px}
+h1{font-size:28px;margin:0} .sub{color:#777;font-size:13px;margin-top:5px}
+button,input,select,textarea{font:inherit;border:1px solid #ddd;border-radius:12px;padding:10px;background:white;color:inherit}
+button{cursor:pointer} .primary{background:#222;color:white;border-color:#222}
+.tabs{display:flex;gap:8px;overflow:auto;margin:16px 0}.tabs button{white-space:nowrap}
+.tabs .active{background:#222;color:white}
+.panel{background:white;border:1px solid #e9e9e6;border-radius:18px;padding:15px;margin:12px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+input,select{width:100%}textarea{width:100%;min-height:75px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
+.movie{border:1px solid #eee;border-radius:15px;overflow:hidden;background:#fff}
+.movie img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#eee}
+.movie .info{padding:10px}.movie h3{font-size:15px;margin:0 0 5px}.muted{color:#777;font-size:12px}
+.movie button{padding:6px 8px;font-size:12px;margin:4px 3px 0 0}
+.hidden{display:none}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:#f5f5f2;padding:12px;border-radius:13px;text-align:center}.stat b{display:block;font-size:23px}
+small{color:#777} .empty{color:#777;text-align:center;padding:30px 8px}
+</style></head>
+<body>
+<header><div><h1>🎬 Кинотрекер</h1><div class="sub">Твоя личная коллекция фильмов</div></div><button id="settingsBtn">⚙️</button></header>
+<div class="tabs"><button class="active" data-tab="collection">Мои фильмы</button><button data-tab="search">Найти фильм</button><button data-tab="favorites">Избранное</button><button data-tab="stats">Статистика</button></div>
+<section id="collection">
+<div class="row"><input id="filter" placeholder="Поиск в моей коллекции"><select id="statusFilter"><option value="all">Все фильмы</option><option value="watched">Просмотрено</option><option value="planned">В планах</option></select></div>
+<div id="movies" class="grid" style="margin-top:14px"></div>
+</section>
+<section id="search" class="hidden">
+<div class="panel"><b>Поиск по каталогу TMDB</b><p class="muted">В настройках добавь свой бесплатный API Read Access Token TMDB. Без токена можно добавлять фильмы вручную.</p>
+<div class="row"><input id="query" placeholder="Название фильма"><button class="primary" id="searchBtn">Найти</button></div></div><div id="results" class="grid"></div>
+<div class="panel"><b>Добавить вручную</b><div class="row" style="margin-top:10px"><input id="manualTitle" placeholder="Название"><input id="manualYear" placeholder="Год" type="number"></div><button class="primary" id="manualAdd" style="margin-top:10px">Добавить в коллекцию</button></div>
+</section>
+<section id="favorites" class="hidden"><div id="favoriteMovies" class="grid"></div></section>
+<section id="stats" class="hidden"><div class="stats"><div class="stat"><b id="total">0</b><small>Всего</small></div><div class="stat"><b id="watched">0</b><small>Просмотрено</small></div><div class="stat"><b id="planned">0</b><small>В планах</small></div></div><div class="panel"><b>Средняя оценка</b><h2 id="average">—</h2><small>По фильмам, которым ты поставила оценку</small></div></section>
+<section id="settings" class="hidden"><div class="panel"><b>Настройки каталога</b><p class="muted">Вставь TMDB API Read Access Token. Токен хранится только в этом браузере.</p><textarea id="token" placeholder="TMDB Read Access Token"></textarea><button class="primary" id="saveToken" style="margin-top:8px">Сохранить токен</button></div><div class="panel"><b>Резервная копия</b><div class="row"><button id="export">Экспорт данных</button><label style="display:block"><input id="importFile" type="file" accept="application/json"></label></div></div></section>
+<script>
+const $=id=>document.getElementById(id);
+let films=JSON.parse(localStorage.getItem('kt_films')||'[]'), token=localStorage.getItem('kt_token')||'';
+$('token').value=token;
+function save(){localStorage.setItem('kt_films',JSON.stringify(films));render()}
+function safe(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function card(m){let poster=m.poster||'https://placehold.co/300x450/e9e9e6/777?text=No+poster';return `<article class="movie"><img src="${poster}" alt=""><div class="info"><h3>${safe(m.title)}</h3><div class="muted">${safe(m.year||'')} · ${m.status==='watched'?'Просмотрено':'В планах'}</div><div>★ ${m.rating||'—'}</div><div><button data-rate="${m.id}">Оценка</button><button data-fav="${m.id}">${m.favorite?'♥':'♡'}</button><button data-note="${m.id}">Заметка</button><button data-status="${m.id}">${m.status==='watched'?'В планы':'Просмотрено'}</button><button data-del="${m.id}">Удалить</button></div>${m.note?`<p class="muted">${safe(m.note)}</p>`:''}</div></article>`}
+function render(){let q=$('filter').value.toLowerCase(),st=$('statusFilter').value;let list=films.filter(m=>m.title.toLowerCase().includes(q)&&(st==='all'||m.status===st));$('movies').innerHTML=list.length?list.map(card).join(''):'<div class="empty">Пока пусто. Найди фильм или добавь его вручную.</div>';$('favoriteMovies').innerHTML=films.some(m=>m.favorite)?films.filter(m=>m.favorite).map(card).join(''):'<div class="empty">В избранном пока ничего нет.</div>';$('total').textContent=films.length;$('watched').textContent=films.filter(m=>m.status==='watched').length;$('planned').textContent=films.filter(m=>m.status==='planned').length;let rated=films.filter(m=>m.rating);$('average').textContent=rated.length?(rated.reduce((a,m)=>a+Number(m.rating),0)/rated.length).toFixed(1)+'/10':'—'}
+function add(m){if(!films.some(x=>x.id===m.id)){films.unshift({...m,status:'planned',favorite:false,rating:0,note:''});save()}}
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));['collection','search','favorites','stats','settings'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.tab))});
+$('settingsBtn').onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));['collection','search','favorites','stats','settings'].forEach(id=>$(id).classList.toggle('hidden',id!=='settings'))};
+document.body.addEventListener('click',e=>{let d=e.target.dataset,id=d.rate||d.fav||d.note||d.status||d.del;if(!id)return;let m=films.find(x=>String(x.id)===String(id));if(d.rate){let v=prompt('Оценка от 1 до 10',m.rating||'');if(v!==null&&Number(v)>=1&&Number(v)<=10)m.rating=Number(v)}if(d.fav)m.favorite=!m.favorite;if(d.note){let v=prompt('Заметка к фильму',m.note||'');if(v!==null)m.note=v}if(d.status)m.status=m.status==='watched'?'planned':'watched';if(d.del&&confirm('Удалить фильм?'))films=films.filter(x=>x.id!==id);save()});
+$('filter').oninput=render;$('statusFilter').onchange=render;
+$('manualAdd').onclick=()=>{let t=$('manualTitle').value.trim();if(!t)return;add({id:'local-'+Date.now(),title:t,year:$('manualYear').value});$('manualTitle').value='';$('manualYear').value=''};
+$('saveToken').onclick=()=>{token=$('token').value.trim();localStorage.setItem('kt_token',token);alert('Токен сохранён')};
+$('searchBtn').onclick=async()=>{let q=$('query').value.trim();if(!q)return;if(!token){alert('Сначала добавь TMDB Read Access Token в настройках.');return}$('results').innerHTML='<div class="empty">Ищем…</div>';try{let r=await fetch('https://api.themoviedb.org/3/search/movie?query='+encodeURIComponent(q)+'&language=ru-RU',{headers:{Authorization:'Bearer '+token,accept:'application/json'}});if(!r.ok)throw Error('Ошибка API: '+r.status);let data=await r.json();$('results').innerHTML=(data.results||[]).map(m=>`<article class="movie"><img src="${m.poster_path?'https://image.tmdb.org/t/p/w500'+m.poster_path:'https://placehold.co/300x450?text=No+poster'}"><div class="info"><h3>${safe(m.title)}</h3><div class="muted">${(m.release_date||'').slice(0,4)}</div><button class="primary" data-add="${m.id}" data-title="${safe(m.title)}" data-year="${(m.release_date||'').slice(0,4)}" data-poster="${m.poster_path?'https://image.tmdb.org/t/p/w500'+m.poster_path:''}">Добавить</button></div></article>`).join('')||'<div class="empty">Ничего не найдено.</div>'}catch(err){$('results').textContent=err.message}};
+document.body.addEventListener('click',e=>{let d=e.target.dataset;if(d.add)add({id:'tmdb-'+d.add,title:d.title,year:d.year,poster:d.poster})});
+$('export').onclick=()=>{let a=document.createElement('a'),blob=new Blob([JSON.stringify(films,null,2)],{type:'application/json'});a.href=URL.createObjectURL(blob);a.download='kinotreker-backup.json';a.click();URL.revokeObjectURL(a.href)};
+$('importFile').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let x=JSON.parse(await f.text());if(Array.isArray(x)){films=x;save();alert('Импортировано')}}catch{alert('Не удалось прочитать файл')}};
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+render();
+</script></body></html>
